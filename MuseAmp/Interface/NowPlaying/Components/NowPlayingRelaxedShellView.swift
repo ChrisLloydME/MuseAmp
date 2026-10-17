@@ -15,8 +15,8 @@ class NowPlayingRelaxedShellView: UIView {
     private(set) var currentRightPanel: NowPlayingRelaxedPanel = .lyrics
 
     private nonisolated enum Layout {
-        /// Inset of the columns from the window edges and, on each side,
-        /// from the line that splits them.
+        /// Inset of the columns from the safe area's left and right edges
+        /// and, on each side, from the line that splits them.
         static let columnInset: CGFloat = 16
     }
 
@@ -78,12 +78,15 @@ class NowPlayingRelaxedShellView: UIView {
 
     private lazy var physicalLeftColumn: UIView = isArtworkColumnOnRight ? rightPanelView : leftPanelView
     private lazy var physicalRightColumn: UIView = isArtworkColumnOnRight ? leftPanelView : rightPanelView
+    /// Pinned to this view's centre, not the content area's: a vertical
+    /// status bar insets only one side, which would move the content
+    /// area's centre off the fold.
     private lazy var leftColumnInnerEdge = physicalLeftColumn.rightAnchor.constraint(
-        equalTo: contentSafeAreaView.centerXAnchor,
+        equalTo: centerXAnchor,
         constant: -Layout.columnInset,
     )
     private lazy var rightColumnInnerEdge = physicalRightColumn.leftAnchor.constraint(
-        equalTo: contentSafeAreaView.centerXAnchor,
+        equalTo: centerXAnchor,
         constant: Layout.columnInset,
     )
 
@@ -101,8 +104,7 @@ class NowPlayingRelaxedShellView: UIView {
     }
 
     /// Where the left column ends and the right column starts, in this
-    /// view's coordinates. The content area is centred in this view, so its
-    /// centre line is `bounds.midX`.
+    /// view's coordinates.
     private func columnSplit() -> (leftColumnMaxX: CGFloat, rightColumnMinX: CGFloat) {
         let gutter = Layout.columnInset
         if let fold = activeVerticalDivision() {
@@ -216,7 +218,9 @@ class NowPlayingRelaxedShellView: UIView {
     private func setupLayout() {
         contentSafeAreaView.snp.makeConstraints { make in
             make.top.bottom.equalToSuperview()
-            make.left.right.equalToSuperview().inset(Layout.columnInset)
+            // A vertical status bar on the iPhone Duo sits inside the left
+            // or right safe area; only the background reaches under it.
+            make.left.right.equalTo(safeAreaLayoutGuide).inset(Layout.columnInset)
         }
 
         physicalLeftColumn.snp.makeConstraints { make in

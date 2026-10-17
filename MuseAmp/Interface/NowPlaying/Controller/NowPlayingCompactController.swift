@@ -227,7 +227,10 @@ class NowPlayingCompactController: UIViewController, NowPlayingQueueShellControl
         view.addSubview(pageViewController.view)
         pageViewController.view.accessibilityIdentifier = "nowplaying.pages"
         pageViewController.view.snp.makeConstraints { make in
-            make.edges.equalToSuperview()
+            make.top.bottom.equalToSuperview()
+            // The iPhone Duo outer display keeps a side safe area for its
+            // status bar and camera; only the background reaches under it.
+            make.left.right.equalTo(view.safeAreaLayoutGuide)
         }
         pageViewController.didMove(toParent: self)
     }
