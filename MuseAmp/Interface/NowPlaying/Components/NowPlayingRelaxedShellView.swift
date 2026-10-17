@@ -14,6 +14,12 @@ class NowPlayingRelaxedShellView: UIView {
 
     private(set) var currentRightPanel: NowPlayingRelaxedPanel = .lyrics
 
+    private nonisolated enum Layout {
+        /// Inset of the columns from the window edges and, on each side,
+        /// from the line that splits them.
+        static let columnInset: CGFloat = 16
+    }
+
     private let contentSafeAreaView: UIView = {
         let view = UIView()
         view.backgroundColor = .clear
@@ -54,12 +60,105 @@ class NowPlayingRelaxedShellView: UIView {
         backgroundColor = .clear
         setupViewHierarchy()
         setupLayout()
+        installHingeObserver()
         switchRightPanel(to: .lyrics, animated: false)
     }
 
     @available(*, unavailable)
     required init?(coder _: NSCoder) {
         fatalError()
+    }
+
+    /// Region frames are in fixed screen orientation, so the split uses
+    /// physical left and right; in right-to-left the artwork column moves
+    /// to the right as it did with leading and trailing.
+    private var isArtworkColumnOnRight: Bool {
+        UIView.userInterfaceLayoutDirection(for: semanticContentAttribute) == .rightToLeft
+    }
+
+    private lazy var physicalLeftColumn: UIView = isArtworkColumnOnRight ? rightPanelView : leftPanelView
+    private lazy var physicalRightColumn: UIView = isArtworkColumnOnRight ? leftPanelView : rightPanelView
+    private lazy var leftColumnInnerEdge = physicalLeftColumn.rightAnchor.constraint(
+        equalTo: contentSafeAreaView.centerXAnchor,
+        constant: -Layout.columnInset,
+    )
+    private lazy var rightColumnInnerEdge = physicalRightColumn.leftAnchor.constraint(
+        equalTo: contentSafeAreaView.centerXAnchor,
+        constant: Layout.columnInset,
+    )
+
+    override func layoutSubviews() {
+        let split = columnSplit()
+        let leftConstant = split.leftColumnMaxX - bounds.midX
+        let rightConstant = split.rightColumnMinX - bounds.midX
+        if leftColumnInnerEdge.constant != leftConstant {
+            leftColumnInnerEdge.constant = leftConstant
+        }
+        if rightColumnInnerEdge.constant != rightConstant {
+            rightColumnInnerEdge.constant = rightConstant
+        }
+        super.layoutSubviews()
+    }
+
+    /// Where the left column ends and the right column starts, in this
+    /// view's coordinates. The content area is centred in this view, so its
+    /// centre line is `bounds.midX`.
+    private func columnSplit() -> (leftColumnMaxX: CGFloat, rightColumnMinX: CGFloat) {
+        let gutter = Layout.columnInset
+        if let fold = activeVerticalDivision() {
+            return (fold.minX - gutter, fold.maxX + gutter)
+        }
+        return (bounds.midX - gutter, bounds.midX + gutter)
+    }
+
+    /// The fold of a partly opened iPhone Duo when it runs down this view.
+    /// Ignored unless it lies in the middle third, so neither column can
+    /// collapse.
+    private func activeVerticalDivision() -> CGRect? {
+        #if MUSEAMP_HAS_RESERVED_REGIONS && !targetEnvironment(macCatalyst)
+            // Regions describe the window's display; a view being removed
+            // from it (folding closed) has none to ask about.
+            if #available(iOS 27.1, *), window != nil {
+                let content = bounds
+                let middleThird = content.insetBy(dx: content.width / 3, dy: 0)
+                for region in reservedRegions(kind: .division) {
+                    let regionFrame: CGRect = region.frame
+                    // Compared by edges: a fold reported as a zero-width
+                    // line is an empty rect, which `intersects` rejects.
+                    guard region.isActive,
+                          regionFrame.height >= regionFrame.width,
+                          regionFrame.maxY > content.minY,
+                          regionFrame.minY < content.maxY,
+                          regionFrame.midX > middleThird.minX,
+                          regionFrame.midX < middleThird.maxX
+                    else { continue }
+                    return regionFrame
+                }
+            }
+        #endif
+        return nil
+    }
+
+    private func installHingeObserver() {
+        #if MUSEAMP_HAS_RESERVED_REGIONS && !targetEnvironment(macCatalyst)
+            if #available(iOS 27.1, *) {
+                // Half open and flat open have the same bounds, so a fold
+                // change alone would not lay the columns out again.
+                //
+                // The handler's isolation is not documented, and it also
+                // runs when this view leaves the window (folding closed
+                // tears the split layout down mid-update). So it asserts
+                // nothing about its thread and only schedules a layout on
+                // the main actor, which the view skips once it is off screen.
+                let interaction = UIHingeInteraction { @Sendable [weak self] _, _ in
+                    Task { @MainActor [weak self] in
+                        guard let self, window != nil else { return }
+                        setNeedsLayout()
+                    }
+                }
+                addInteraction(interaction)
+            }
+        #endif
     }
 
     func switchRightPanel(to panel: NowPlayingRelaxedPanel, animated: Bool) {
@@ -117,18 +216,18 @@ class NowPlayingRelaxedShellView: UIView {
     private func setupLayout() {
         contentSafeAreaView.snp.makeConstraints { make in
             make.top.bottom.equalToSuperview()
-            make.leading.trailing.equalToSuperview().inset(16)
+            make.left.right.equalToSuperview().inset(Layout.columnInset)
         }
 
-        leftPanelView.snp.makeConstraints { make in
-            make.leading.top.bottom.equalToSuperview()
-            make.width.equalToSuperview().multipliedBy(0.5)
+        physicalLeftColumn.snp.makeConstraints { make in
+            make.left.top.bottom.equalToSuperview()
         }
 
-        rightPanelView.snp.makeConstraints { make in
-            make.trailing.top.bottom.equalToSuperview()
-            make.width.equalTo(contentSafeAreaView.snp.width).multipliedBy(0.5)
+        physicalRightColumn.snp.makeConstraints { make in
+            make.right.top.bottom.equalToSuperview()
         }
+
+        NSLayoutConstraint.activate([leftColumnInnerEdge, rightColumnInnerEdge])
 
         leftContentView.snp.makeConstraints { make in
             make.edges.equalToSuperview()

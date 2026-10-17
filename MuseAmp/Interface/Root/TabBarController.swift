@@ -30,6 +30,12 @@ class TabBarController: UITabBarController {
     ).then { $0.accessibilityIdentifier = "popup.next" }
     var nowPlayingPopupContentViewController: NowPlayingCompactController?
     var isNowPlayingPopupOpen = false
+    /// Set by the root before it attaches this shell in place of a layout
+    /// whose Now Playing was open, so the next attach opens it again.
+    var restoresOpenNowPlaying = false
+    /// Bumped on every detach, so a deferred reopen of Now
+    /// Playing only runs while the attachment that scheduled it lasts.
+    var attachmentGeneration = 0
     private(set) lazy var popupPagingHandler = PopupBarPagingHandler(
         playbackController: environment.playbackController,
         onRequestUpdate: { [weak self] in
@@ -215,6 +221,68 @@ class TabBarController: UITabBarController {
         }
 
         viewControllers = navControllers
+    }
+
+    // MARK: - Root Destination
+
+    /// The root destination of the selected tab, so a layout swap can show
+    /// the same section in the sidebar.
+    var selectedRootDestination: RootDestination? {
+        guard let selectedViewController else { return nil }
+        return Self.rootDestination(of: selectedViewController)
+    }
+
+    /// Selects the tab for a sidebar destination. Destinations without a
+    /// tab keep the current selection.
+    func selectRootDestination(_ destination: RootDestination) {
+        let target: RootDestination = destination == .library ? .albums : destination
+
+        if #available(iOS 18.0, *) {
+            let tab = tabs.first { candidate in
+                switch target {
+                case .albums:
+                    candidate.identifier == "albums"
+                case .songs:
+                    candidate.identifier == "songs"
+                case .playlistList:
+                    candidate.identifier == "playlist"
+                case .settings:
+                    candidate.identifier == "settings"
+                case .search:
+                    candidate is UISearchTab
+                case .library, .downloads:
+                    false
+                }
+            }
+            guard let tab, selectedTab !== tab else { return }
+            selectedTab = tab
+            return
+        }
+
+        guard let index = viewControllers?.firstIndex(where: { Self.rootDestination(of: $0) == target }),
+              selectedIndex != index
+        else { return }
+        selectedIndex = index
+    }
+
+    private static func rootDestination(of tabViewController: UIViewController) -> RootDestination? {
+        guard let navigationController = tabViewController as? UINavigationController,
+              let rootViewController = navigationController.viewControllers.first
+        else { return nil }
+        switch rootViewController {
+        case is SongLibraryViewController:
+            return .albums
+        case is SongsViewController:
+            return .songs
+        case is PlaylistViewController:
+            return .playlistList
+        case is SearchViewController:
+            return .search
+        case is SettingsViewController:
+            return .settings
+        default:
+            return nil
+        }
     }
 
     private func bindDownloadsBadge() {

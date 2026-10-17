@@ -96,16 +96,18 @@ class NowPlayingCompactController: UIViewController, NowPlayingQueueShellControl
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
         updatePopupCloseButtonAppearance(for: controlIslandViewModel.selectedContentSelector)
-        Interface.smoothSpringAnimate {
-            self.pageViewController.view.transform = .identity
-            var candidates: [UIView] = [self.view]
-            while let first = candidates.first {
-                candidates.removeFirst()
-                candidates.append(contentsOf: first.subviews)
-                first.transform = .identity
-                first.setNeedsLayout()
+        // A fold restore opens without animation, before this view has been
+        // laid out at its final size. Animating that first layout would grow
+        // or shrink the artwork from its build size, and an artwork load
+        // landing mid-spring leaves the image and its rounded box apart.
+        guard animated else {
+            UIView.performWithoutAnimation {
+                resetTransformsAndRelayout()
             }
-            self.view.layoutIfNeeded()
+            return
+        }
+        Interface.smoothSpringAnimate {
+            self.resetTransformsAndRelayout()
         }
     }
 
@@ -113,6 +115,27 @@ class NowPlayingCompactController: UIViewController, NowPlayingQueueShellControl
         super.viewDidAppear(animated)
         isNowPlayingSurfaceVisible = true
         refreshLyricsScreenAwakeHold()
+        if !animated {
+            // The popup gives this view its final frame and safe area while
+            // opening, after viewWillAppear; lay every view out again at
+            // that size so a restored Now Playing matches a freshly opened
+            // one.
+            UIView.performWithoutAnimation {
+                resetTransformsAndRelayout()
+            }
+        }
+    }
+
+    private func resetTransformsAndRelayout() {
+        pageViewController.view.transform = .identity
+        var candidates: [UIView] = [view]
+        while let first = candidates.first {
+            candidates.removeFirst()
+            candidates.append(contentsOf: first.subviews)
+            first.transform = .identity
+            first.setNeedsLayout()
+        }
+        view.layoutIfNeeded()
     }
 
     override func viewDidDisappear(_ animated: Bool) {

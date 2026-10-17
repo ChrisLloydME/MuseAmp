@@ -40,11 +40,48 @@ extension TabBarController {
     override func didMove(toParent parent: UIViewController?) {
         super.didMove(toParent: parent)
         guard parent != nil else {
+            // Only a detach cancels a pending reopen: UIKit can report the
+            // same attach more than once.
+            attachmentGeneration &+= 1
             nowPlayingPopupContentViewController = nil
+            isNowPlayingPopupOpen = false
+            restoresOpenNowPlaying = false
             return
         }
         prepareNowPlayingPopupContentViewController()
-        syncPopupPresentation(with: environment.playbackController.snapshot)
+        guard restoresOpenNowPlaying else {
+            syncPopupPresentation(with: environment.playbackController.snapshot)
+            return
+        }
+        restoresOpenNowPlaying = false
+        reopenNowPlayingAfterAttach()
+    }
+
+    /// Opens Now Playing without animation once the shell has been laid out
+    /// at its new size: LNPopupController can drop an open requested before
+    /// the container's first layout.
+    private func reopenNowPlayingAfterAttach() {
+        let generation = attachmentGeneration
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            // A second fold or unfold before this runs detaches the shell
+            // (and may attach it again), so this request no longer applies.
+            guard generation == attachmentGeneration, hostsNowPlayingPopup else {
+                AppLog.info(self, "reopenNowPlayingAfterAttach skipped, shell moved")
+                return
+            }
+            let snapshot = environment.playbackController.snapshot
+            guard snapshot.currentTrack != nil else {
+                AppLog.info(self, "reopenNowPlayingAfterAttach skipped, nothing playing")
+                syncPopupPresentation(with: snapshot)
+                return
+            }
+            view.layoutIfNeeded()
+            // Nothing may keep the keyboard up over the restored Now Playing.
+            view.window?.endEditing(true)
+            AppLog.info(self, "reopenNowPlayingAfterAttach")
+            ensureNowPlayingPopupPresented(openFullscreen: true, animated: false)
+        }
     }
 
     func configurePopupBar() {

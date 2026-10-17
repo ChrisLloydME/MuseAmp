@@ -514,7 +514,7 @@
 				INFOPLIST_KEY_NSCameraUsageDescription = "Your camera is used to scan a QR code displayed on another device during local-network song transfers. The camera feed is processed on-device in real time and is never recorded, stored, or shared.";
 				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "Your local network is used to discover nearby devices and transfer songs between them. All data stays on your local network and is never sent to external servers.";
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
-				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
 				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -566,7 +566,7 @@
 				INFOPLIST_KEY_NSCameraUsageDescription = "Your camera is used to scan a QR code displayed on another device during local-network song transfers. The camera feed is processed on-device in real time and is never recorded, stored, or shared.";
 				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "Your local network is used to discover nearby devices and transfer songs between them. All data stays on your local network and is never sent to external servers.";
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
-				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
 				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
 				LD_RUNPATH_SEARCH_PATHS = (

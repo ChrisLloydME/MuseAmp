@@ -9,3 +9,19 @@ CODE_SIGNING_REQUIRED = YES
 CODE_SIGNING_SUPPORTED = YES
 PRODUCT_BUNDLE_IDENTIFIER = wiki.qaq.muse.amp
 PROVISIONING_PROFILE_SPECIFIER = 
+
+// Defined when the SDK declares UIView.reservedRegions(kind:options:) and
+// UIHingeInteraction (iOS 27.1). The SDKs listed below predate them; every
+// other SDK, including later ones, gets the condition. Mac Catalyst and tvOS
+// never do.
+MUSEAMP_RESERVED_REGIONS_CONDITION = MUSEAMP_HAS_RESERVED_REGIONS
+MUSEAMP_RESERVED_REGIONS_CONDITION[sdk=iphoneos27.0*] =
+MUSEAMP_RESERVED_REGIONS_CONDITION[sdk=iphonesimulator27.0*] =
+MUSEAMP_RESERVED_REGIONS_CONDITION[sdk=iphoneos26*] =
+MUSEAMP_RESERVED_REGIONS_CONDITION[sdk=iphonesimulator26*] =
+MUSEAMP_RESERVED_REGIONS_CONDITION[sdk=iphoneos1*] =
+MUSEAMP_RESERVED_REGIONS_CONDITION[sdk=iphonesimulator1*] =
+MUSEAMP_RESERVED_REGIONS_CONDITION[sdk=macosx*] =
+MUSEAMP_RESERVED_REGIONS_CONDITION[sdk=appletvos*] =
+MUSEAMP_RESERVED_REGIONS_CONDITION[sdk=appletvsimulator*] =
+SWIFT_ACTIVE_COMPILATION_CONDITIONS = $(inherited) $(MUSEAMP_RESERVED_REGIONS_CONDITION)

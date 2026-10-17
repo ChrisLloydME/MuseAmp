@@ -62,6 +62,7 @@ class NowPlayingRelaxedController: UIViewController, NowPlayingQueueShellControl
         queuePanelView: queuePanelView,
     )
     lazy var closeButton = makeCloseButton()
+    let dismissDragRegion = UIView()
 
     // MARK: - Right Panel
 
@@ -96,7 +97,11 @@ class NowPlayingRelaxedController: UIViewController, NowPlayingQueueShellControl
         installContentLayout()
         installLeftPanel()
         installRightPanel()
-        installCloseButton()
+        #if targetEnvironment(macCatalyst)
+            installCloseButton()
+        #else
+            installDismissDragRegion()
+        #endif
         hideTitlebarScrollEdgeEffects()
         bindQueueSectionActions()
         bindContentSelector()
