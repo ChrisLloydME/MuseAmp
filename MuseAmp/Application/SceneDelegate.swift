@@ -102,6 +102,41 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
     }
 }
 
+// MARK: - Interface Orientation
+
+#if !targetEnvironment(macCatalyst)
+    extension SceneDelegate {
+        /// The Info.plist allows landscape so that wide displays such as the
+        /// iPhone Duo inner display can fill the screen, but regular iPhones
+        /// and the Duo outer display stay portrait. This decides orientation
+        /// support, not layout, so reading the size of the scene's own screen
+        /// (the Duo has two) is intended here.
+        static func supportedInterfaceOrientations(for windowScene: UIWindowScene?) -> UIInterfaceOrientationMask {
+            guard UIDevice.current.userInterfaceIdiom == .phone else {
+                // Same as INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad.
+                return .all
+            }
+            guard let screenBounds = windowScene?.screen.bounds else {
+                return .portrait
+            }
+            let shorterSide = min(screenBounds.width, screenBounds.height)
+            return shorterSide >= 600 ? .allButUpsideDown : .portrait
+        }
+
+        @available(iOS 27.0, *)
+        func supportedInterfaceOrientations(for windowScene: UIWindowScene) -> UIInterfaceOrientationMask {
+            Self.supportedInterfaceOrientations(for: windowScene)
+        }
+
+        /// Folding or unfolding iPhone Duo moves the scene to the other
+        /// display without a relaunch, so the supported orientations change.
+        @available(iOS 26.0, *)
+        func windowScene(_: UIWindowScene, didUpdateEffectiveGeometry _: UIWindowScene.Geometry) {
+            window?.rootViewController?.setNeedsUpdateOfSupportedInterfaceOrientations()
+        }
+    }
+#endif
+
 // MARK: - File Import Handling
 
 private extension SceneDelegate {
