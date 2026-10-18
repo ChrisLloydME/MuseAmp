@@ -12,7 +12,10 @@ import UIKit
 // MARK: - Close Button
 
 /// A pointer cannot drag the popup closed on Mac, so the relaxed layout
-/// keeps its own close button in the top trailing corner, on iPad as well.
+/// keeps its own close button in the top trailing corner there. On iPad and
+/// the iPhone Duo inner display Now Playing closes with a downward drag
+/// instead; the button is still built on every platform so its string stays
+/// in the catalog.
 extension NowPlayingRelaxedController {
     enum CloseButtonStyle {
         /// Swap for "chevron.down" to drop the circle.
@@ -31,6 +34,8 @@ extension NowPlayingRelaxedController {
         static let slideDuration: TimeInterval = 0.45
         static let slideDampingRatio: CGFloat = 1.0
         static let slideInitialVelocity: CGFloat = 0.8
+        /// How far the dismiss drag region reaches below the top safe area.
+        static let dragRegionHeight: CGFloat = 24
     }
 
     func makeCloseButton() -> UIButton {
@@ -71,6 +76,21 @@ extension NowPlayingRelaxedController {
                 make.top.trailing.equalTo(view.safeAreaLayoutGuide).inset(CloseButtonStyle.edgeInset)
             #endif
             make.size.equalTo(CloseButtonStyle.hitSide)
+        }
+    }
+
+    /// Takes drags that start along the top edge, so they close Now Playing.
+    /// Without it they land on the lyric or queue list, which
+    /// LNPopupController scrolls instead of closing unless the list is at its
+    /// top. It spans the full width and draws nothing: on the iPhone Duo
+    /// inner display a centred handle would sit on the fold.
+    func installDismissDragRegion() {
+        dismissDragRegion.backgroundColor = .clear
+        dismissDragRegion.accessibilityIdentifier = "nowplaying.dismissDragRegion"
+        view.addSubview(dismissDragRegion)
+        dismissDragRegion.snp.makeConstraints { make in
+            make.top.leading.trailing.equalToSuperview()
+            make.bottom.equalTo(view.safeAreaLayoutGuide.snp.top).offset(CloseButtonStyle.dragRegionHeight)
         }
     }
 

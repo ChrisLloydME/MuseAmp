@@ -11,6 +11,20 @@ class NowPlayingCenterSectionView: UIView {
     let avatarSectionView: NowPlayingAvatarSectionView
     let transportContentView: UIView
     private let transportLayout: TransportLayout
+    private var frameBottomConstraint: Constraint?
+
+    /// Height of controls the owner draws over the bottom of this view. The
+    /// column keeps its content above them instead of under them.
+    var bottomObstructionHeight: CGFloat = 0 {
+        didSet {
+            guard oldValue != bottomObstructionHeight else { return }
+            frameBottomConstraint?.update(offset: -frameBottomInset)
+        }
+    }
+
+    private var frameBottomInset: CGFloat {
+        max(NowPlayingArtworkLayout.bottomInset, bottomObstructionHeight)
+    }
 
     var onArtworkLoaded: (URL, UIImage) -> Void = { _, _ in } {
         didSet {
@@ -75,7 +89,7 @@ class NowPlayingCenterSectionView: UIView {
             make.top.greaterThanOrEqualTo(scrollView.contentLayoutGuide.snp.top)
             make.bottom.lessThanOrEqualTo(scrollView.contentLayoutGuide.snp.bottom)
             make.top.greaterThanOrEqualTo(scrollView.frameLayoutGuide.snp.top).offset(NowPlayingArtworkLayout.topInset).priority(NowPlayingArtworkLayout.contentPriority)
-            make.bottom.lessThanOrEqualTo(scrollView.frameLayoutGuide.snp.bottom).offset(-NowPlayingArtworkLayout.bottomInset).priority(NowPlayingArtworkLayout.contentPriority)
+            frameBottomConstraint = make.bottom.lessThanOrEqualTo(scrollView.frameLayoutGuide.snp.bottom).offset(-frameBottomInset).priority(NowPlayingArtworkLayout.contentPriority).constraint
         }
 
         avatarSectionView.snp.makeConstraints { make in

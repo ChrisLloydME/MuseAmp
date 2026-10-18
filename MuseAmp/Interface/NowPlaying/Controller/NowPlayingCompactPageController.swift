@@ -11,6 +11,11 @@ import SnapKit
 import UIKit
 
 final class NowPlayingCompactPageController: UIViewController {
+    private nonisolated enum Layout {
+        /// Height of the AirPlay and More row.
+        static let auxiliaryHeight: CGFloat = 44
+    }
+
     private let listSectionView = NowPlayingListSectionView()
     private let compactTransportView: NowPlayingCompactTransportView
     private lazy var centerSectionView = NowPlayingCenterSectionView(
@@ -102,6 +107,20 @@ final class NowPlayingCompactPageController: UIViewController {
         installAuxiliaryView()
     }
 
+    override func viewSafeAreaInsetsDidChange() {
+        super.viewSafeAreaInsetsDidChange()
+        updateArtworkBottomObstruction()
+    }
+
+    /// Every page fills the view and the AirPlay and More row sits on the
+    /// bottom safe area, so the row covers the bottom of the artwork page by
+    /// its height plus that inset. Derived from the safe area rather than
+    /// the row's laid-out frame, so the artwork constraint changes only when
+    /// the safe area does instead of after every layout pass.
+    private func updateArtworkBottomObstruction() {
+        centerSectionView.bottomObstructionHeight = Layout.auxiliaryHeight + view.safeAreaInsets.bottom
+    }
+
     func installRoutePickerView(_ routePickerView: AVRoutePickerView) {
         compactTransportView.installRoutePickerView(routePickerView)
     }
@@ -151,8 +170,9 @@ final class NowPlayingCompactPageController: UIViewController {
         auxiliaryView.snp.makeConstraints { make in
             make.leading.trailing.equalToSuperview()
             make.bottom.equalTo(view.safeAreaLayoutGuide.snp.bottom)
-            make.height.equalTo(44)
+            make.height.equalTo(Layout.auxiliaryHeight)
         }
+        updateArtworkBottomObstruction()
     }
 
     private func installPagingSectionView() {
