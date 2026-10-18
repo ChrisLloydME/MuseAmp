@@ -30,6 +30,12 @@ nonisolated enum SearchItem: Hashable {
     case loadingIndicator
 }
 
+private nonisolated enum SearchFocus {
+    /// Covers the appearance a fold or unfold triggers, which lands within
+    /// a run loop turn or two of the swap.
+    static let layoutSwapSuppression: TimeInterval = 1.0
+}
+
 @MainActor
 class SearchViewController: UIViewController {
     typealias Section = SearchSection
@@ -75,6 +81,13 @@ class SearchViewController: UIViewController {
     let historyStore = SearchHistoryStore()
     let historyTableView = UITableView(frame: UIScreen.main.bounds, style: .plain)
     var searchHistory: [String] = []
+    /// Until then an appearance leaves the search field unfocused. Set when
+    /// a fold or unfold carries the Search section into a new layout, so the
+    /// keyboard does not come up by itself (over a restored Now Playing).
+    /// A deadline rather than a one-shot flag: the new layout may show this
+    /// screen just before or just after the root asks, and a flag nothing
+    /// consumed would swallow a later, user-driven appearance.
+    private var automaticFocusSuppressedUntil: Date = .distantPast
 
     lazy var diffableDataSource: UITableViewDiffableDataSource<SearchSection, SearchItem> = {
         let ds = UITableViewDiffableDataSource<SearchSection, SearchItem>(tableView: tableView) { [weak self] tableView, indexPath, item in
@@ -116,9 +129,21 @@ class SearchViewController: UIViewController {
 
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
+        guard Date() >= automaticFocusSuppressedUntil else {
+            AppLog.info(self, "viewDidAppear skipping automatic search field focus after a layout swap")
+            return
+        }
         if !searchController.isActive, searchController.searchBar.text?.isEmpty != false {
             searchController.searchBar.becomeFirstResponder()
         }
+    }
+
+    /// Called by the root when a layout swap carries this screen into the
+    /// new layout. Keeps the field from focusing itself for a moment and
+    /// drops focus it already took.
+    func suppressAutomaticFocusForLayoutSwap() {
+        automaticFocusSuppressedUntil = Date().addingTimeInterval(SearchFocus.layoutSwapSuppression)
+        searchController.searchBar.endEditing(true)
     }
 
     private func configureSearchController() {

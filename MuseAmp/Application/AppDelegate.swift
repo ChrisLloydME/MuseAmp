@@ -44,6 +44,16 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         return configuration
     }
 
+    #if !targetEnvironment(macCatalyst)
+        /// Before iOS 27; later versions ask `SceneDelegate` per scene.
+        func application(
+            _: UIApplication,
+            supportedInterfaceOrientationsFor window: UIWindow?,
+        ) -> UIInterfaceOrientationMask {
+            SceneDelegate.supportedInterfaceOrientations(for: window?.windowScene)
+        }
+    #endif
+
     #if targetEnvironment(macCatalyst)
         override func buildMenu(with builder: any UIMenuBuilder) {
             super.buildMenu(with: builder)

@@ -75,6 +75,35 @@ extension MainController {
         if popupContainerController.popupPresentationState != .barHidden {
             popupContainerController.dismissPopupBar(animated: false)
         }
+        // Dismissing does not report a close, so the flag would otherwise
+        // stay set while the compact layout is installed.
+        isNowPlayingPopupOpen = false
+    }
+
+    /// Opens Now Playing without animation once the new split layout has
+    /// been laid out: LNPopupController can drop an open requested before
+    /// the container's first layout at its new size.
+    func reopenNowPlayingPopupAfterLayout() {
+        let generation = layoutTransitionGeneration
+        DispatchQueue.main.async { [weak self] in
+            // A second fold or unfold before this runs replaces the split
+            // layout, so this request no longer applies.
+            guard let self else { return }
+            guard generation == layoutTransitionGeneration,
+                  currentLayoutMode != .compact,
+                  rootSplitViewController.parent === self,
+                  view.window != nil,
+                  environment.playbackController.snapshot.currentTrack != nil
+            else {
+                AppLog.info(self, "reopenNowPlayingPopupAfterLayout skipped, layout or playback changed")
+                return
+            }
+            view.layoutIfNeeded()
+            // Nothing may keep the keyboard up over the restored Now Playing.
+            view.window?.endEditing(true)
+            AppLog.info(self, "reopenNowPlayingPopupAfterLayout")
+            ensurePopupPresented(openFullscreen: true, animated: false)
+        }
     }
 
     private func configurePopupBar() {

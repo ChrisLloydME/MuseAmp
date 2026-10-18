@@ -79,9 +79,9 @@ class MuseAmpImageView: UIView {
 
     func showImageState() {
         stopLoadingShimmer()
-        imageView.layer.removeAllAnimations()
-        blurView.layer.removeAllAnimations()
-        placeholderView.layer.removeAllAnimations()
+        removeNonGeometryAnimations(from: imageView.layer)
+        removeNonGeometryAnimations(from: blurView.layer)
+        removeNonGeometryAnimations(from: placeholderView.layer)
         imageView.alpha = 1
         blurView.alpha = 0
         placeholderView.alpha = 0
@@ -175,6 +175,21 @@ class MuseAmpImageView: UIView {
         tapGestureRecognizer.isEnabled = false
         imageView.isUserInteractionEnabled = false
         imageView.addGestureRecognizer(tapGestureRecognizer)
+    }
+
+    /// Cancels in-flight fades but keeps frame animations: removing those
+    /// mid layout animation snaps the image to its final frame while this
+    /// view's rounded backing still animates, so the two drift apart.
+    private func removeNonGeometryAnimations(from layer: CALayer) {
+        for key in layer.animationKeys() ?? [] {
+            let isGeometry = key.hasPrefix("position")
+                || key.hasPrefix("bounds")
+                || key.hasPrefix("transform")
+                || key.hasPrefix("anchorPoint")
+            if !isGeometry {
+                layer.removeAnimation(forKey: key)
+            }
+        }
     }
 
     private func updatePlaceholderSize() {

@@ -121,6 +121,9 @@ class MainController: UIViewController {
     ).then { $0.accessibilityIdentifier = "popup.next" }
     var nowPlayingPopupContentViewController: NowPlayingRelaxedController?
     var isNowPlayingPopupOpen = false
+    /// Bumped on every layout transition, so a deferred reopen of Now
+    /// Playing only runs for the layout that scheduled it.
+    var layoutTransitionGeneration = 0
     private(set) lazy var popupPagingHandler = PopupBarPagingHandler(
         playbackController: environment.playbackController,
         onRequestUpdate: { [weak self] in
@@ -254,17 +257,42 @@ class MainController: UIViewController {
 
     func transitionToMode(_ mode: LayoutMode) {
         let previousMode = currentLayoutMode
+        // Read before the teardown below closes Now Playing and detaches the
+        // old root, so folding or unfolding keeps both.
+        let wasNowPlayingOpen = isNowPlayingOpen(in: previousMode)
+        let carriedDestination = rootDestination(in: previousMode)
+        AppLog.Layout.info(
+            self,
+            "transitionToMode \(String(describing: previousMode)) -> \(mode) nowPlayingOpen=\(wasNowPlayingOpen) destination=\(carriedDestination.map { String(describing: $0) } ?? "nil")",
+        )
         currentLayoutMode = mode
+        layoutTransitionGeneration &+= 1
 
+        let isRootSwap = previousMode != nil
         switch mode {
         case .compact:
             teardownRelaxedLayout()
+            compactTabBarController.restoresOpenNowPlaying = wasNowPlayingOpen
             installCompactLayout()
+            if let carriedDestination {
+                compactTabBarController.selectRootDestination(carriedDestination)
+            }
+            if isRootSwap {
+                suppressSearchFieldFocusAfterRootSwap()
+            }
         case .relaxed:
             teardownCompactLayout()
+            adoptSidebarDestination(carriedDestination)
+            if isRootSwap {
+                suppressSearchFieldFocusAfterRootSwap()
+            }
             installRelaxedLayout()
         case .catalyst:
             teardownCompactLayout()
+            adoptSidebarDestination(carriedDestination)
+            if isRootSwap {
+                suppressSearchFieldFocusAfterRootSwap()
+            }
             installCatalystLayout()
             #if targetEnvironment(macCatalyst)
                 installSidebarToggleButton()
@@ -276,6 +304,79 @@ class MainController: UIViewController {
         } else if mode == .compact, previousMode != nil, previousMode != .compact {
             unbindPlaybackPopup()
         }
+
+        if mode != .compact, previousMode == .compact {
+            sidebarViewController.loadViewIfNeeded()
+            if let selectedPlaylistID {
+                sidebarViewController.selectItem(.playlist(selectedPlaylistID))
+            } else {
+                sidebarViewController.selectItem(.destination(selectedDestination))
+            }
+            if wasNowPlayingOpen {
+                reopenNowPlayingPopupAfterLayout()
+            }
+        }
+    }
+
+    private func isNowPlayingOpen(in layoutMode: LayoutMode?) -> Bool {
+        switch layoutMode {
+        case .compact:
+            compactTabBarControllerIfLoaded?.popupPresentationState == .open
+        case .relaxed, .catalyst:
+            popupContainerController.popupPresentationState == .open
+        case nil:
+            false
+        }
+    }
+
+    /// A Search screen focuses its field when it appears, which raises the
+    /// keyboard. After a fold or unfold the screen appears only because its
+    /// section was carried into the new root, often under a restored Now
+    /// Playing, so it skips that. The sidebar layout calls this before
+    /// installing its content; the tab layout can only after selecting the
+    /// tab, so the screen also drops focus it already took.
+    private func suppressSearchFieldFocusAfterRootSwap() {
+        let navigationController: UINavigationController? = switch currentLayoutMode {
+        case .compact:
+            compactTabBarControllerIfLoaded?.selectedViewController as? UINavigationController
+        case .relaxed, .catalyst:
+            // Playlists never show Search; otherwise this is the cached
+            // controller installRelaxedLayout is about to show.
+            selectedPlaylistID == nil
+                ? contentNavigationController(for: selectedDestination)
+                : nil
+        case nil:
+            nil
+        }
+        guard let searchViewController = navigationController?.topViewController as? SearchViewController else {
+            return
+        }
+        AppLog.Layout.info(self, "suppressSearchFieldFocusAfterRootSwap")
+        searchViewController.suppressAutomaticFocusForLayoutSwap()
+    }
+
+    /// The section the outgoing root shows, as a sidebar destination.
+    private func rootDestination(in layoutMode: LayoutMode?) -> RootDestination? {
+        switch layoutMode {
+        case .compact:
+            compactTabBarControllerIfLoaded?.selectedRootDestination
+        case .relaxed, .catalyst:
+            selectedPlaylistID != nil ? .playlistList : selectedDestination
+        case nil:
+            nil
+        }
+    }
+
+    /// Shows the tab's section in the sidebar layout about to be installed.
+    /// From iOS 26 Settings opens as a sheet there, so that tab keeps the
+    /// sidebar's previous section.
+    private func adoptSidebarDestination(_ destination: RootDestination?) {
+        guard let destination else { return }
+        if #available(iOS 26.0, *), destination == .settings {
+            return
+        }
+        selectedDestination = destination
+        selectedPlaylistID = nil
     }
 
     // MARK: - Destination Selection
@@ -475,8 +576,8 @@ class MainController: UIViewController {
         guard !urls.isEmpty else { return }
 
         let alert = AlertProgressIndicatorViewController(
-            title: String(localized: "Importing"),
-            message: String(localized: "Reading audio files..."),
+            title: "Importing",
+            message: "Reading audio files...",
         )
         present(alert, animated: true)
 
@@ -525,10 +626,10 @@ class MainController: UIViewController {
         }
 
         let alert = AlertViewController(
-            title: String(localized: "Import Complete"),
-            message: lines.joined(separator: "\n"),
+            title: "Import Complete",
+            message: .init(lines.joined(separator: "\n")),
         ) { context in
-            context.addAction(title: String(localized: "OK"), attribute: .accent) {
+            context.addAction(title: "OK", attribute: .accent) {
                 context.dispose()
             }
         }
