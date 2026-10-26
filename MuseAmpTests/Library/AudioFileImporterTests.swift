@@ -127,6 +127,8 @@ struct AudioFileImporterTests {
         #expect(await builder.sourceHasCatalogComment(at: stored, expectedTrackID: track.trackID))
         let batch = try await builder.prepareBatch(deviceName: "Test", tracks: [track], includeLyrics: true)
         defer { builder.cleanup(batch: batch) }
+        #expect(batch.manifest.protocolVersion == SyncConstants.localIdentityProtocolVersion)
+        #expect(!SyncConstants.isCompatible(protocolVersion: "4", entries: batch.manifest.entries))
         let transferred = try #require(batch.filesByTrackID[track.trackID])
         #expect(await EmbeddedLyricsReader.lyrics(fromFileAt: transferred) == "[00:01.00]Original lyrics")
         #expect(try await commentPayload(at: transferred)["originalComments"] as? [String] == ["Original notes"])
