@@ -5,6 +5,24 @@ import Testing
 @Suite(.serialized)
 struct APIClientTransferTests {
     @Test
+    func `local identities never trigger remote music requests`() async throws {
+        let client = makeClient { _ in
+            Issue.record("A local identity must not be sent to the server")
+            throw URLError(.badURL)
+        }
+        let trackID = "local-track-" + String(repeating: "a", count: 64)
+        let albumID = "local-album-" + String(repeating: "b", count: 64)
+        #expect(try await client.song(id: trackID) == nil)
+        #expect(try await client.album(id: albumID) == nil)
+        #expect(try await client.lyrics(id: trackID, bypassCache: true).isEmpty)
+        for id in [trackID, albumID] {
+            await #expect(throws: (any Error).self) {
+                try await client.playback(id: id)
+            }
+        }
+    }
+
+    @Test
     func `authenticate transfer posts password and returns token`() async throws {
         let client = makeClient { request in
             #expect(request.httpMethod == "POST")
